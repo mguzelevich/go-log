@@ -1,4 +1,4 @@
-# go-log [![Build Status](https://travis-ci.org/mguzelevich/go-log.svg?branch=master)](https://travis-ci.org/mguzelevich/go-log)
+# go.log [![GoDoc](https://godoc.org/github.com/mguzelevich/go.log?status.svg)](http://godoc.org/github.com/mguzelevich/go.log) [![Build Status](https://travis-ci.org/mguzelevich/go.log.svg?branch=master)](https://travis-ci.org/mguzelevich/go.log)
 
 
 go logger wrapper
@@ -6,20 +6,21 @@ go logger wrapper
 
 # usage
 
+NOTE: use `nil` instead `ioutil.Discard` for disable log level
+
 init:
 
 ```
 import (
-	"io/ioutil"
 	"os"
 
-	"github.com/mguzelevich/go-log"
+	"github.com/mguzelevich/go.log"
 )
 
 func main() {
 	log.InitLoggers(&log.Logger{
-		ioutil.Discard,
-		ioutil.Discard,
+		nil,
+		nil,
 		os.Stdout,
 		os.Stdout,
 		os.Stderr,

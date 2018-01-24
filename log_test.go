@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 var timestamp string
@@ -25,24 +27,43 @@ func initAndLog(logger *Logger) {
 	Error.Printf("Error.Printf")
 }
 
+var tests = map[string]struct {
+	logger  *Logger
+	enabled []string
+}{
+	"empty_init": {
+		logger:  nil,
+		enabled: []string{"stdout", "stderr"},
+	},
+	"trace": {
+		logger:  &Logger{Trace: os.Stdout},
+		enabled: []string{"stdout", "stderr", "trace"},
+	},
+	"all": {
+		logger:  &Logger{os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stderr},
+		enabled: []string{"stdout", "stderr", "trace", "debug", "info", "warning", "error"},
+	},
+}
+
 func getExpected(ts string, loggers ...string) string {
+	baseLine := 21
 	out := []string{}
 	for _, l := range loggers {
 		switch l {
 		case "stdout":
-			out = append(out, fmt.Sprintf("%s log_test.go:19: Stdout.Printf", ts))
+			out = append(out, fmt.Sprintf("%s log_test.go:%d: Stdout.Printf", ts, baseLine))
 		case "stderr":
-			out = append(out, fmt.Sprintf("%s log_test.go:20: Stderr.Printf", ts))
+			out = append(out, fmt.Sprintf("%s log_test.go:%d: Stderr.Printf", ts, baseLine+1))
 		case "trace":
-			out = append(out, fmt.Sprintf("TRACE: %s log_test.go:21: Trace.Printf", ts))
+			out = append(out, fmt.Sprintf("TRACE: %s log_test.go:%d: Trace.Printf", ts, baseLine+2))
 		case "debug":
-			out = append(out, fmt.Sprintf("DEBUG: %s log_test.go:22: Debug.Printf", ts))
+			out = append(out, fmt.Sprintf("DEBUG: %s log_test.go:%d: Debug.Printf", ts, baseLine+3))
 		case "info":
-			out = append(out, fmt.Sprintf("INFO: %s Info.Printf", ts))
+			out = append(out, fmt.Sprintf("INFO: %s Info.Printf", ts)) // baseLine+4
 		case "warning":
-			out = append(out, fmt.Sprintf("WARNING: %s log_test.go:24: Warning.Printf", ts))
+			out = append(out, fmt.Sprintf("WARNING: %s log_test.go:%d: Warning.Printf", ts, baseLine+5))
 		case "error":
-			out = append(out, fmt.Sprintf("ERROR: %s log_test.go:25: Error.Printf", ts))
+			out = append(out, fmt.Sprintf("ERROR: %s log_test.go:%d: Error.Printf", ts, baseLine+6))
 		default:
 			panic("unknown")
 		}
@@ -51,82 +72,37 @@ func getExpected(ts string, loggers ...string) string {
 	return strings.Join(out, "\n")
 }
 
-func TestLog_init_empty(t *testing.T) {
-	if os.Getenv("GO_TEST_FORKED_PROCESS") == "1" {
-		initAndLog(nil)
-		os.Exit(0)
-		return
-	}
-	out, err := helperCommand(t)
-	if err != nil {
-		t.Errorf("got %q", err)
-	}
-	expected := getExpected(timestamp, "stdout", "stderr")
-	if string(out) != expected {
-		t.Errorf("Expected %q, got %q", expected, out)
-	}
-}
+func _TestRun(t *testing.T) {
+	t.Logf("run %v %v", loggers["trace"], *loggers["trace"].logger)
+	InitLoggers(&Logger{
+		Trace: os.Stdout,
+	})
 
-func TestLog_trace(t *testing.T) {
-	if os.Getenv("GO_TEST_FORKED_PROCESS") == "1" {
-		initAndLog(&Logger{Trace: os.Stdout})
-		os.Exit(0)
-		return
-	}
+	t.Logf("run %v %v", loggers["trace"], *loggers["trace"].logger)
+	t.Logf("run %v", Levels())
 
-	out, err := helperCommand(t)
-	if err != nil {
-		t.Errorf("got %q", err)
-	}
-	expected := getExpected(timestamp, "stdout", "stderr", "trace")
-	if string(out) != expected {
-		t.Errorf("Expected %q, got %q", expected, out)
-	}
-}
-
-func TestLog_all(t *testing.T) {
-	if os.Getenv("GO_TEST_FORKED_PROCESS") == "1" {
-		initAndLog(&Logger{
-			os.Stdout,
-			os.Stdout,
-			os.Stdout,
-			os.Stdout,
-			os.Stderr,
-		})
-		os.Exit(0)
-		return
-	}
-
-	out, err := helperCommand(t)
-	if err != nil {
-		t.Errorf("got %q", err)
-	}
-	expected := getExpected(timestamp, "stdout", "stderr", "trace", "debug", "info", "warning", "error")
-	if string(out) != expected {
-		t.Errorf("Expected %q, got %q", expected, out)
-	}
+	assert := assert.New(t)
+	assert.NotNil(nil)
 }
 
 func TestLog(t *testing.T) {
-	if os.Getenv("GO_TEST_FORKED_PROCESS") == "1" {
-		initAndLog(&Logger{
-			os.Stdout,
-			os.Stdout,
-			os.Stdout,
-			os.Stdout,
-			os.Stderr,
-		})
+	// https://medium.com/agrea-technogies/basic-testing-patterns-in-go-d8501e360197
+	name := os.Getenv("GO_TEST_FORKED_PROCESS")
+	tst := tests[name]
+	if name != "" {
+		// fmt.Printf("run %s %v %v\n", name, tst, Levels())
+		initAndLog(tst.logger)
 		os.Exit(0)
 		return
 	}
 
-	out, err := helperCommand(t)
-	if err != nil {
-		t.Errorf("got %q", err)
-	}
-	expected := getExpected(timestamp, "stdout", "stderr")
-	if string(out) != expected {
-		t.Errorf("Expected %q, got %q", expected, out)
+	assert := assert.New(t)
+	for testName, test := range tests {
+		t.Logf("Running test case %s", testName)
+		out, err := helperCommand(t, testName)
+		assert.Nil(err)
+		// assert.Equal(test.enabled, Levels(), "")
+		assert.Equal(getExpected(timestamp, test.enabled...), string(out), "")
 	}
 }
 
@@ -144,10 +120,10 @@ func ExampleLog_stdout() {
 	Stderr.Printf("Stderr.Printf")
 }
 
-func helperCommand(t *testing.T) (string, error) {
+func helperCommand(t *testing.T, testName string) (string, error) {
 	cs := []string{fmt.Sprintf("-test.run=%s", helperCaller()), "--"}
 	cmd := exec.Command(os.Args[0], cs...)
-	cmd.Env = []string{"GO_TEST_FORKED_PROCESS=1"}
+	cmd.Env = []string{fmt.Sprintf("GO_TEST_FORKED_PROCESS=%s", testName)}
 
 	out, err := cmd.CombinedOutput()
 
